@@ -1,0 +1,38 @@
+# Optional Ingress manifest (if an Ingress Controller like ingress-nginx or Azure App Routing is enabled).
+# Note: On AKS, the default recommended exposure method is type: LoadBalancer on the Services (see k8s/apps/poll/service.yaml and k8s/apps/result/service.yaml).
+#
+# Because the 'result' app serves its assets and WebSocket directly on '/', host-based routing
+# (or distinct subdomains) is required when using an Ingress:
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: poll-result
+  namespace: bernstein-poll
+  annotations:
+    # Example for ingress-nginx:
+    # kubernetes.io/ingress.class: nginx
+    # For Azure Application Gateway Ingress Controller:
+    # kubernetes.io/ingress.class: azure/application-gateway
+spec:
+  # ingressClassName: nginx
+  rules:
+    - host: poll.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: poll
+                port:
+                  number: 80
+    - host: result.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: result
+                port:
+                  number: 80

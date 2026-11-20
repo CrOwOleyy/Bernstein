@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-schema
+  namespace: bernstein-poll
+data:
+  schema.sql: |
+    CREATE TABLE IF NOT EXISTS votes
+    (
+      id text PRIMARY KEY,
+      vote text NOT NULL
+    );
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-schema-init
+  namespace: bernstein-poll
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        app: postgres-schema-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: schema-init
+          image: postgres:18-alpine
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for postgres service..."
+              until pg_isready -h postgres -p 5432 -U "$POSTGRES_USER"; do
+                echo "Postgres is unavailable - waiting 2 seconds..."
+                sleep 2
+              done
+              echo "Postgres is ready! Applying schema..."
+              psql -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /schema/schema.sql
+          volumeMounts:
+            - name: schema
+              mountPath: /schema
+      volumes:
+        - name: schema
+          configMap:
+            name: postgres-schema

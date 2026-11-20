@@ -1,0 +1,26 @@
+# PostgreSQL: only worker (UPSERT), result (SELECT) and the schema-init Job may connect.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-allow-worker-result
+  namespace: bernstein-poll
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: worker
+        - podSelector:
+            matchLabels:
+              app: result
+        - podSelector:
+            matchLabels:
+              app: postgres-schema-init
+      ports:
+        - protocol: TCP
+          port: 5432

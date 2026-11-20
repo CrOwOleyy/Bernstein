@@ -1,0 +1,42 @@
+name: Build & push images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/poll/**"
+      - "app/worker/**"
+      - "app/result/**"
+      - ".github/workflows/build-push.yml"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write   # required for Azure OIDC login, no stored client secret
+  contents: read
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [poll, worker, result]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to the private registry
+        run: az acr login --name "${{ vars.ACR_NAME }}"
+
+      - name: Build and push
+        working-directory: app/${{ matrix.service }}
+        run: |
+          image="${{ vars.ACR_LOGIN_SERVER }}/${{ matrix.service }}"
+          docker build -t "$image:${{ github.sha }}" -t "$image:latest" .
+          docker push "$image:${{ github.sha }}"
+          docker push "$image:latest"
